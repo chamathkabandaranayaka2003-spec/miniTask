@@ -10,6 +10,10 @@
   --shadow: 0 20px 55px rgba(0, 0, 0, 0.12);
   --chart-line: #1e40af;
   --chart-fill: rgba(30, 64, 175, 0.14);
+
+  --animation-speed: 0.55s;
+  --animation-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --bg-animation-duration: 30s;
 }
 
 .dark {
@@ -38,11 +42,11 @@ body {
 body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: radial-gradient(circle at top, rgba(30, 64, 175, 0.14), transparent 55%),
-    radial-gradient(circle at 65% 20%, rgba(16, 185, 129, 0.14), transparent 50%),
-    var(--bg);
+  background: #020617;
   color: var(--text);
-  transition: background 280ms ease, color 280ms ease;
+  transition: none;
+  overflow-x: hidden;
+  position: relative;
 }
 
 a {
@@ -58,6 +62,9 @@ a {
   padding: clamp(1.25rem, 5vw, 2.5rem);
   max-width: 1100px;
   margin: 0 auto;
+  opacity: 1;
+  transform: none;
+  animation: none;
 }
 
 .app__header {
@@ -135,7 +142,7 @@ a {
   position: relative;
   cursor: pointer;
   box-shadow: var(--shadow);
-  transition: background 240ms ease, border-color 240ms ease;
+  transition: none;
 }
 
 .theme-toggle__thumb {
@@ -147,7 +154,7 @@ a {
   border-radius: 999px;
   background: var(--surface-strong);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
-  transition: transform 260ms ease, background 240ms ease;
+  transition: none;
 }
 
 .dark .theme-toggle__thumb {
@@ -177,6 +184,9 @@ a {
   display: flex;
   gap: 1rem;
   align-items: center;
+  opacity: 1;
+  transform: none;
+  animation: none;
 }
 
 .card__edit {
@@ -194,6 +204,7 @@ a {
   border: 1px solid rgba(255, 255, 255, 0.22);
   color: var(--accent);
   background: rgba(255, 255, 255, 0.18);
+  transition: none;
 }
 
 .dark .card__icon {
@@ -211,13 +222,13 @@ a {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: transform 200ms ease, background 200ms ease;
+  transition: none;
   color: var(--muted);
 }
 
 .card__edit:hover {
-  transform: scale(1.05);
-  background: rgba(255, 255, 255, 0.34);
+  transform: none;
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .card__edit:focus-visible {
@@ -266,13 +277,13 @@ a {
   place-items: center;
   padding: 0.65rem;
   cursor: pointer;
-  transition: transform 160ms ease, background 160ms ease;
+  transition: none;
   color: var(--text);
 }
 
 .icon-picker__item:hover {
-  transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.24);
+  transform: none;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .icon-picker__close {
@@ -282,6 +293,61 @@ a {
   border-radius: 999px;
   align-self: flex-end;
   cursor: pointer;
+  color: var(--text);
+}
+
+.glass-popup {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+  width: 260px;
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  display: none;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 80;
+}
+
+.glass-popup[aria-hidden="false"] {
+  display: flex;
+}
+
+.icon-picker[aria-hidden="false"] {
+}
+
+.glass-popup__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.glass-popup__label {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.glass-popup__value {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.glass-popup__slider {
+  width: 100%;
+}
+
+.glass-popup__input {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.18);
   color: var(--text);
 }
 
@@ -301,6 +367,67 @@ a {
   font-weight: 700;
   line-height: 1.1;
   margin-top: 0.25rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  width: 100%;
+  max-width: 10rem;
+  padding: 0;
+  appearance: none;
+  cursor: pointer;
+}
+
+.card__value:focus {
+  outline: none;
+}
+
+/* Hide number input spinners */
+.card__value::-webkit-outer-spin-button,
+.card__value::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.card__value[type='number'] {
+  -moz-appearance: textfield;
+}
+
+.pulse {
+  animation: pulse-border 0.8s ease-out;
+}
+
+.card.saved {
+  border-color: rgba(0, 242, 255, 0.9);
+  box-shadow: 0 0 0 0 rgba(0, 242, 255, 0);
+  animation: saveGlow 0.7s ease-out;
+}
+
+.card.saved .card__value {
+  color: rgba(0, 242, 255, 0.95);
+}
+
+@keyframes saveGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.9);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(0, 242, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 242, 255, 0);
+  }
+}
+
+@keyframes pulse-border {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.8);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(0, 242, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 242, 255, 0);
+  }
 }
 
 .card--chart {
@@ -411,3 +538,4 @@ a {
     align-items: flex-start;
   }
 }
+

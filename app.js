@@ -17,6 +17,11 @@ const elements = {
   iconPicker: document.getElementById('iconPicker'),
   iconGrid: document.querySelector('.icon-picker__grid'),
   iconPickerClose: document.querySelector('.icon-picker__close'),
+  popup: document.getElementById('categoryPopup'),
+  popupLabel: document.getElementById('popupLabel'),
+  popupValue: document.getElementById('popupValue'),
+  popupSlider: document.getElementById('popupSlider'),
+  popupInput: document.getElementById('popupInput'),
 };
 
 const defaultCategories = [
@@ -115,14 +120,6 @@ function calculateBurnRate(totalSpent, allowance) {
   return Math.min(100, (totalSpent / allowance) * 100);
 }
 
-function formatCurrency(value) {
-  return value.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  });
-}
-
 function calculateDailyTotals(spending) {
   const days = spending.needs.map((_, idx) => {
     const dailySum = spending.needs[idx] + spending.wants[idx] + spending.savings[idx];
@@ -146,9 +143,104 @@ function buildLabels(dayCount) {
 }
 
 let currentIconCategoryId = null;
+let currentPopupCategoryId = null;
 
 function getCategoryIconSvg(iconKey) {
   return iconLibrary[iconKey] || iconLibrary.home;
+}
+
+function setCategoryTotal(categoryId, value) {
+  categoryOverrideTotals[categoryId] = value;
+  const currentMonthSpending = monthlySpending[elements.monthSelect.value];
+  const totals = calculateTotals(currentMonthSpending);
+  updateSummary(totals, DEFAULT_ALLOWANCE);
+}
+
+function showPopup(categoryId, anchorEl) {
+  if (!elements.popup) return;
+  currentPopupCategoryId = categoryId;
+
+  const labelEl = document.querySelector(`.card__title[data-category-id="${categoryId}"]`);
+  const value = getTotalWithOverride(categoryId, calculateTotals(monthlySpending[elements.monthSelect.value])[categoryId]);
+
+  elements.popupLabel.textContent = labelEl ? labelEl.textContent : categoryId;
+  elements.popupValue.textContent = formatCurrency(value);
+  elements.popupSlider.value = value;
+  elements.popupInput.value = value.toFixed(2);
+
+  const rect = anchorEl.getBoundingClientRect();
+  const offsetX = rect.left + rect.width / 2;
+  const offsetY = rect.bottom + 14;
+
+  elements.popup.style.left = `${offsetX}px`;
+  elements.popup.style.top = `${offsetY}px`;
+  elements.popup.setAttribute('aria-hidden', 'false');
+}
+
+function hidePopup() {
+  if (!elements.popup) return;
+  elements.popup.setAttribute('aria-hidden', 'true');
+  if (currentPopupCategoryId) {
+    const value = Number(elements.popupInput.value);
+    if (!Number.isNaN(value)) {
+      sendCategoryUpdate(currentPopupCategoryId, value);
+    }
+  }
+  currentPopupCategoryId = null;
+}
+
+function setupPopupInteractions() {
+  const iconEls = document.querySelectorAll('.card__icon');
+  iconEls.forEach((icon) => {
+    const categoryId = icon.dataset.categoryId;
+    if (!categoryId) return;
+
+    icon.addEventListener('pointerenter', () => showPopup(categoryId, icon));
+    icon.addEventListener('pointerleave', (event) => {
+      const to = event.relatedTarget;
+      if (elements.popup && !elements.popup.contains(to)) {
+        hidePopup();
+      }
+    });
+
+    icon.addEventListener('click', () => showPopup(categoryId, icon));
+  });
+
+  if (!elements.popup) return;
+
+  elements.popup.addEventListener('pointerleave', (event) => {
+    const to = event.relatedTarget;
+    if (!elements.popup.contains(to)) {
+      hidePopup();
+    }
+  });
+
+  elements.popupSlider.addEventListener('input', () => {
+    const value = Number(elements.popupSlider.value);
+    if (Number.isNaN(value)) return;
+    elements.popupInput.value = value.toFixed(2);
+    elements.popupValue.textContent = formatCurrency(value);
+    if (currentPopupCategoryId) {
+      setCategoryTotal(currentPopupCategoryId, value);
+    }
+  });
+
+  elements.popupInput.addEventListener('input', () => {
+    const value = Number(elements.popupInput.value);
+    if (Number.isNaN(value)) return;
+    elements.popupSlider.value = value;
+    elements.popupValue.textContent = formatCurrency(value);
+    if (currentPopupCategoryId) {
+      setCategoryTotal(currentPopupCategoryId, value);
+    }
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!elements.popup || elements.popup.getAttribute('aria-hidden') === 'true') return;
+    if (!elements.popup.contains(event.target) && !event.target.closest('.card__icon')) {
+      hidePopup();
+    }
+  });
 }
 
 function applyCategorySettings() {
@@ -162,6 +254,88 @@ function applyCategorySettings() {
 
     if (titleEl) titleEl.textContent = label;
     if (iconEl) iconEl.innerHTML = getCategoryIconSvg(icon);
+  });
+}
+
+async function sendCategoryUpdate(categoryId, total) {
+  try {
+    const response = await fetch('/updateCategory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categoryId, total }),
+    });
+    if (!response.ok) throw new Error('Failed');
+
+    pulseCard(categoryId);
+    showSaveFeedback(categoryId);
+  } catch (error) {
+    console.warn('Failed to sync category:', error);
+  }
+}
+
+function pulseCard(categoryId) {
+  const card = document.querySelector(`.card[data-category-id="${categoryId}"]`);
+  if (!card) return;
+  card.classList.add('pulse');
+  setTimeout(() => card.classList.remove('pulse'), 800);
+}
+
+function showSaveFeedback(categoryId) {
+  const card = document.querySelector(`.card[data-category-id="${categoryId}"]`);
+  if (!card) return;
+  card.classList.add('saved');
+  setTimeout(() => card.classList.remove('saved'), 700);
+}
+
+function setupValueEditing() {
+  document.querySelectorAll('.card__value').forEach((input) => {
+    const categoryId = input.dataset.categoryId;
+    if (!categoryId) return;
+
+    let debounceTimer = null;
+
+    const applyValue = (value) => {
+      categoryOverrideTotals[categoryId] = value;
+
+      const currentMonthSpending = monthlySpending[elements.monthSelect.value];
+      const totals = calculateTotals(currentMonthSpending);
+      updateSummary(totals, DEFAULT_ALLOWANCE);
+    };
+
+    const scheduleSync = (value) => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        sendCategoryUpdate(categoryId, value);
+      }, 400);
+    };
+
+    const commitValue = () => {
+      const rawValue = input.value.trim();
+      const value = rawValue === '' ? 0 : Number(rawValue);
+      if (Number.isNaN(value)) return;
+      const fixed = Number(value.toFixed(2));
+      input.value = fixed.toFixed(2);
+      applyValue(fixed);
+      sendCategoryUpdate(categoryId, fixed);
+    };
+
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      if (Number.isNaN(value)) return;
+      const fixed = Number(value.toFixed(2));
+      applyValue(fixed);
+      scheduleSync(fixed);
+    });
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        commitValue();
+        input.blur();
+      }
+    });
+
+    input.addEventListener('blur', commitValue);
   });
 }
 
@@ -284,6 +458,7 @@ function createChart(ctx, labels, allowedLine, expenseCumulative, theme) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       scales: {
         x: {
           grid: { display: false },
@@ -293,7 +468,7 @@ function createChart(ctx, labels, allowedLine, expenseCumulative, theme) {
           grid: { color: isDark ? 'rgba(231,238,252,0.12)' : 'rgba(16,42,67,0.12)' },
           ticks: {
             color: isDark ? 'rgba(231,238,252,0.75)' : 'rgba(16,42,67,0.75)',
-            callback: (value) => `$${value}`,
+            callback: (value) => `$${value.toFixed(2)}`,
           },
         },
       },
@@ -315,14 +490,6 @@ function createChart(ctx, labels, allowedLine, expenseCumulative, theme) {
               return `${ctx.dataset.label}: ${formatCurrency(value)}`;
             },
           },
-        },
-      },
-      animations: {
-        tension: {
-          duration: 700,
-          easing: 'easeOutQuart',
-          from: 0.4,
-          to: 0.35,
         },
       },
     },
@@ -367,21 +534,80 @@ function updateChartData(chart, allowance, cumulative, theme) {
   chart.options.plugins.tooltip.titleColor = isDark ? '#e7eefc' : '#0f172a';
   chart.options.plugins.tooltip.bodyColor = isDark ? '#e7eefc' : '#0f172a';
 
-  chart.update();
+  chart.update({
+    duration: 0,
+  });
+}
+
+const categoryOverrideTotals = {};
+let burnChart = null;
+
+function getTotalWithOverride(categoryId, computedTotal) {
+  const override = categoryOverrideTotals[categoryId];
+  return typeof override === 'number' ? override : computedTotal;
+}
+
+function formatCurrency(value) {
+  return value.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function updateSummary(totals, allowance) {
-  const totalSpent = totals.needs + totals.wants + totals.savings;
+  const needsTotal = getTotalWithOverride('needs', totals.needs);
+  const wantsTotal = getTotalWithOverride('wants', totals.wants);
+  const savingsTotal = getTotalWithOverride('savings', totals.savings);
+
+  const totalSpent = needsTotal + wantsTotal + savingsTotal;
   const remaining = Math.max(0, allowance - totalSpent);
   const burnRate = calculateBurnRate(totalSpent, allowance);
 
-  elements.needsValue.textContent = formatCurrency(totals.needs);
-  elements.wantsValue.textContent = formatCurrency(totals.wants);
-  elements.savingsValue.textContent = formatCurrency(totals.savings);
+  elements.needsValue.value = needsTotal.toFixed(2);
+  elements.wantsValue.value = wantsTotal.toFixed(2);
+  elements.savingsValue.value = savingsTotal.toFixed(2);
 
   elements.allowanceValue.textContent = formatCurrency(allowance);
   elements.remainingValue.textContent = formatCurrency(remaining);
   elements.burnRateValue.textContent = `${Math.round(burnRate)}%`;
+
+  if (burnChart) {
+    updateChartFromOverrides();
+  }
+}
+
+function updateChartFromOverrides() {
+  if (!burnChart) return;
+  const currentMonthSpending = monthlySpending[elements.monthSelect.value];
+  const monthTotals = calculateTotals(currentMonthSpending);
+  const dailyTotals = calculateDailyTotals(currentMonthSpending);
+  const cumulative = calculateCumulative(dailyTotals);
+
+  const originalTotal = monthTotals.needs + monthTotals.wants + monthTotals.savings;
+  const overrideTotal = getTotalWithOverride('needs', monthTotals.needs)
+    + getTotalWithOverride('wants', monthTotals.wants)
+    + getTotalWithOverride('savings', monthTotals.savings);
+
+  const scale = originalTotal > 0 ? overrideTotal / originalTotal : 1;
+
+  const adjusted = cumulative.map((value, idx) => {
+    const scaled = value * scale;
+    return Number(scaled.toFixed(2));
+  });
+
+  if (adjusted.length > 0) {
+    adjusted[adjusted.length - 1] = Number(overrideTotal.toFixed(2));
+  }
+
+  updateChartData(burnChart, DEFAULT_ALLOWANCE, adjusted, elements.body.classList.contains('dark') ? 'dark' : 'light');
+}
+
+function setCardAnimationIndices() {
+  document.querySelectorAll('.card').forEach((card, index) => {
+    card.style.setProperty('--card-index', String(index));
+  });
 }
 
 function init() {
@@ -389,6 +615,9 @@ function init() {
   applyTheme(isDarkMode);
 
   setupCategoryEditing();
+  setCardAnimationIndices();
+  setupValueEditing();
+  setupPopupInteractions();
   populateMonthOptions();
 
   const currentMonth = elements.monthSelect.value;
@@ -402,17 +631,14 @@ function init() {
   const labels = buildLabels(cumulative.length);
   const baseline = Array(cumulative.length).fill(DEFAULT_ALLOWANCE);
 
-  const chart = createChart(elements.chartCanvas, labels, baseline, cumulative, isDarkMode ? 'dark' : 'light');
+  burnChart = createChart(elements.chartCanvas, labels, baseline, cumulative, isDarkMode ? 'dark' : 'light');
 
   elements.monthSelect.addEventListener('change', () => {
     const selected = elements.monthSelect.value;
     const monthSpending = monthlySpending[selected];
     const monthTotals = calculateTotals(monthSpending);
-    const monthDaily = calculateDailyTotals(monthSpending);
-    const monthCumulative = calculateCumulative(monthDaily);
 
     updateSummary(monthTotals, DEFAULT_ALLOWANCE);
-    updateChartData(chart, DEFAULT_ALLOWANCE, monthCumulative, elements.body.classList.contains('dark') ? 'dark' : 'light');
   });
 
   elements.themeToggle.addEventListener('click', () => {
@@ -421,11 +647,7 @@ function init() {
     persistTheme(nextMode);
 
     // Reapply chart theme/colors while keeping current month data
-    const currentMonthSpending = monthlySpending[elements.monthSelect.value];
-    const currentDaily = calculateDailyTotals(currentMonthSpending);
-    const currentCumulative = calculateCumulative(currentDaily);
-
-    updateChartData(chart, DEFAULT_ALLOWANCE, currentCumulative, nextMode ? 'dark' : 'light');
+    updateChartFromOverrides();
   });
 }
 

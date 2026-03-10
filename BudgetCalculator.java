@@ -55,7 +55,7 @@ public final class BudgetCalculator {
             return totals;
         }
         for (ExpenseCategory category : categories) {
-            totals.put(category.getId(), calculateMonthlyTotal(category.getDailyExpenses()));
+            totals.put(category.getId(), category.getTotal());
         }
         return totals;
     }
