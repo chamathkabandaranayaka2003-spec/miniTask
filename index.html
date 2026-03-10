@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Income vs Expense Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="app__header">
+      <div>
+        <h1 class="app__title">Monthly Overview</h1>
+        <p class="app__subtitle">See how far you are into the month and how much budget is left.</p>
+      </div>
+
+      <div class="header-controls">
+        <div class="month-selector">
+          <label for="monthSelect" class="month-selector__label">Month</label>
+          <select id="monthSelect" class="month-selector__select" aria-label="Select month"></select>
+        </div>
+
+        <div class="theme-toggle" aria-label="Toggle dark / light mode">
+          <span class="theme-toggle__label" id="themeLabel" aria-live="polite">Light</span>
+          <button id="themeToggle" class="theme-toggle__button" type="button" aria-pressed="false">
+            <span class="theme-toggle__thumb" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="summary">
+        <div class="card">
+          <div class="card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2c4.418 0 8 3.582 8 8v6a2 2 0 0 1-2 2h-2"/>
+              <path d="M4 18h16"/>
+              <path d="M8 22h8"/>
+              <path d="M4 10h16"/>
+            </svg>
+          </div>
+          <div class="card__body">
+            <div class="card__title">Needs</div>
+            <div class="card__value" id="needsValue">$0</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s-7-4-7-10a7 7 0 0 1 14 0c0 6-7 10-7 10z"/>
+              <path d="M12 11v5"/>
+            </svg>
+          </div>
+          <div class="card__body">
+            <div class="card__title">Wants</div>
+            <div class="card__value" id="wantsValue">$0</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v18"/>
+              <path d="M6 11h12"/>
+              <path d="M6 15h6"/>
+            </svg>
+          </div>
+          <div class="card__body">
+            <div class="card__title">Savings</div>
+            <div class="card__value" id="savingsValue">$0</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="chart">
+        <div class="card card--chart">
+          <header class="card__header">
+            <h2 class="card__heading">Monthly Progress</h2>
+            <div class="card__meta">
+              <div class="meta-item">
+                <span class="meta-label">Allowance</span>
+                <span class="meta-value" id="allowanceValue">$0</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Remaining</span>
+                <span class="meta-value" id="remainingValue">$0</span>
+              </div>
+            </div>
+          </header>
+
+          <div class="chart__wrapper">
+            <canvas id="burnChart" aria-label="Daily spending chart" role="img"></canvas>
+          </div>
+
+          <footer class="chart__footer">
+            <div class="footer__item">
+              <span class="footer__label">Burn Rate</span>
+              <span class="footer__value" id="burnRateValue">0%</span>
+            </div>
+            <div class="footer__hint">Tip: Hover the chart for per‑day details.</div>
+          </footer>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app__footer">
+      <p>Built for students to monitor spending and stay ahead of the month.</p>
+    </footer>
+  </div>
+</body>
+</html>
