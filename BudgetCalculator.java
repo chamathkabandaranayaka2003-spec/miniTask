@@ -46,6 +46,33 @@ public final class BudgetCalculator {
     }
 
     /**
+     * Calculate totals for multiple categories identified by stable IDs.
+     * This allows labels to change without affecting the math.
+     */
+    public static java.util.Map<String, Double> calculateTotalsByCategory(java.util.List<ExpenseCategory> categories) {
+        java.util.Map<String, Double> totals = new java.util.LinkedHashMap<>();
+        if (categories == null) {
+            return totals;
+        }
+        for (ExpenseCategory category : categories) {
+            totals.put(category.getId(), calculateMonthlyTotal(category.getDailyExpenses()));
+        }
+        return totals;
+    }
+
+    public static double calculateRemainingBalance(double allowance, java.util.List<ExpenseCategory> categories) {
+        if (allowance <= 0) {
+            return 0;
+        }
+        double spent = 0;
+        for (double amount : calculateTotalsByCategory(categories).values()) {
+            spent += amount;
+        }
+        double remaining = allowance - spent;
+        return remaining < 0 ? 0 : remaining;
+    }
+
+    /**
      * Convert a daily expense array into a cumulative running total.
      * This is useful to plot how spending accumulates over a month.
      *
@@ -87,14 +114,27 @@ public final class BudgetCalculator {
      */
     public static void main(String[] args) {
         double allowance = 2000;
-        double[] daily = { 180, 150, 210, 175, 220, 190, 205 };
+        double[] needs = { 180, 150, 210, 175, 220, 190, 205 };
+        double[] wants = { 70, 55, 90, 65, 85, 60, 88 };
+        double[] savings = { 90, 88, 92, 85, 95, 82, 90 };
+
+        java.util.List<ExpenseCategory> categories = java.util.List.of(
+            new ExpenseCategory("needs", "Needs", needs),
+            new ExpenseCategory("wants", "Wants", wants),
+            new ExpenseCategory("savings", "Savings", savings)
+        );
 
         System.out.println("Monthly allowance: " + allowance);
-        System.out.println("Daily spend (formatted):");
-        for (String value : formatDailyExpenses(daily)) {
+        System.out.println("Category totals (by id):");
+        calculateTotalsByCategory(categories).forEach((id, total) ->
+            System.out.printf("  %s: $%.2f%n", id, total)
+        );
+
+        System.out.println("Remaining: " + calculateRemainingBalance(allowance, categories));
+
+        System.out.println("Formatted daily spend for 'needs':");
+        for (String value : formatDailyExpenses(needs)) {
             System.out.println("  " + value);
         }
-
-        System.out.println("Remaining: " + calculateRemainingBalance(allowance, daily));
     }
 }
